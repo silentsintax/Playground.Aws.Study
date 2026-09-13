@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mxfile host="app.diagrams.net" agent="claude" version="24.0.0" type="device">
+  <diagram name="Arquitetura Multi-Clearing" id="arch-multi-clearing">
+    <mxGraphModel dx="1200" dy="800" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1000" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Main pipeline -->
+        <mxCell id="n_kafka" value="Kafka&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Mensagem da operação&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1efe6;strokeColor=#b9b6a8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="40" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_lambdaA" value="Lambda: consumer Kafka&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Valida e grava no DynamoDB&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef4fb;strokeColor=#7ea6cf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="140" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_dynamo" value="DynamoDB: outbox + tracking&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Única fonte da verdade&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ea;strokeColor=#6ea173;" vertex="1" parent="1">
+          <mxGeometry x="60" y="240" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_streams" value="DynamoDB Streams&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Dispara Lambda de envio&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3edf7;strokeColor=#9a7cb8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="340" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_lambdaB" value="Lambda: envia à clearing&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Gateway multi-clearing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef4fb;strokeColor=#7ea6cf;" vertex="1" parent="1">
+          <mxGeometry x="60" y="440" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_clearing" value="B3 / SELIC / CIP&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Processa, responde depois&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1efe6;strokeColor=#b9b6a8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="540" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_sns" value="SNS: tópico de resposta&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Notificação assíncrona&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3edf7;strokeColor=#9a7cb8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="640" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_sqs" value="SQS: fila intermediária&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Buffer, retry e DLQ&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f3edf7;strokeColor=#9a7cb8;" vertex="1" parent="1">
+          <mxGeometry x="60" y="740" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_lambdaC" value="Lambda: atualiza DynamoDB&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Correlaciona por IdExterno&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf3ea;strokeColor=#6ea173;" vertex="1" parent="1">
+          <mxGeometry x="60" y="840" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Side column: reference + reconciliation -->
+        <mxCell id="n_referencia" value="Tabela de referência&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Clearings + StatusMapping&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f1efe6;strokeColor=#b9b6a8;" vertex="1" parent="1">
+          <mxGeometry x="400" y="240" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_reconciliacao" value="Job de reconciliação&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Lê pendentes, consulta clearing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fdf1e3;strokeColor=#c98a3e;" vertex="1" parent="1">
+          <mxGeometry x="400" y="440" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Reporting column -->
+        <mxCell id="n_glue" value="Glue (job noturno)&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Exporta por tipo de item&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef4fb;strokeColor=#7ea6cf;" vertex="1" parent="1">
+          <mxGeometry x="680" y="240" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_s3" value="S3 — data mesh&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;outbox / eventos / divergências&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef4fb;strokeColor=#7ea6cf;" vertex="1" parent="1">
+          <mxGeometry x="680" y="340" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="n_athena" value="Athena&lt;br&gt;&lt;font style=&quot;font-size:11px;color:#5b5c58&quot;&gt;Consulta analítica / BI&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eef4fb;strokeColor=#7ea6cf;" vertex="1" parent="1">
+          <mxGeometry x="680" y="440" width="200" height="60" as="geometry" />
+        </mxCell>
+
+        <!-- Main pipeline edges -->
+        <mxCell id="e1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_kafka" target="n_lambdaA">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_lambdaA" target="n_dynamo">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_dynamo" target="n_streams">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_streams" target="n_lambdaB">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_lambdaB" target="n_clearing">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_clearing" target="n_sns">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_sns" target="n_sqs">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_sqs" target="n_lambdaC">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e9" value="grava novo evento e status" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;exitX=1;exitY=0.5;entryX=1;entryY=0.5;fontSize=10;" edge="1" parent="1" source="n_lambdaC" target="n_dynamo">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="340" y="870" />
+              <mxPoint x="340" y="270" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Side connections -->
+        <mxCell id="e10" value="consulta ao enviar" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9a988e;dashed=1;fontSize=10;" edge="1" parent="1" source="n_lambdaB" target="n_referencia">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e11" value="lê itens pendentes" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9a988e;dashed=1;fontSize=10;" edge="1" parent="1" source="n_dynamo" target="n_reconciliacao">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e12" value="consulta status" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#9a988e;dashed=1;fontSize=10;" edge="1" parent="1" source="n_reconciliacao" target="n_clearing">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="620" y="470" />
+              <mxPoint x="620" y="570" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+
+        <!-- Reporting chain -->
+        <mxCell id="e13" value="export noturno" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;fontSize=10;" edge="1" parent="1" source="n_dynamo" target="n_glue">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_glue" target="n_s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e15" style="edgeStyle=orthogonalEdgeStyle;rounded=0;html=1;strokeColor=#5b5c58;" edge="1" parent="1" source="n_s3" target="n_athena">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

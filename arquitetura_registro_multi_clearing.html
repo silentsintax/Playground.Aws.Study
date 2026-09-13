@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arquitetura — Registro de Operações Multi-Clearing</title>
+<style>
+  :root {
+    --bg: #fafaf8;
+    --panel: #ffffff;
+    --ink: #1c1d1b;
+    --muted: #5b5c58;
+    --line: #e2e0d8;
+    --accent: #2f5d50;
+    --accent-soft: #e7f0ec;
+    --lambda: #eef4fb;
+    --lambda-line: #7ea6cf;
+    --dynamo: #eaf3ea;
+    --dynamo-line: #6ea173;
+    --msg: #f3edf7;
+    --msg-line: #9a7cb8;
+    --recon: #fdf1e3;
+    --recon-line: #c98a3e;
+    --code-bg: #21231f;
+    --code-ink: #e8e6dd;
+    --mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.55;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 56px 24px 96px; }
+  header.doc-header {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 24px;
+    margin-bottom: 40px;
+  }
+  header.doc-header .kicker {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-size: 30px;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }
+  .subtitle { color: var(--muted); font-size: 16px; max-width: 640px; }
+  h2 {
+    font-size: 21px;
+    margin: 48px 0 16px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  h3 { font-size: 16.5px; margin: 28px 0 10px; }
+  p { max-width: 72ch; }
+  .note {
+    background: var(--accent-soft);
+    border-left: 3px solid var(--accent);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0;
+    font-size: 14.5px;
+    max-width: 68ch;
+  }
+  .warn {
+    background: var(--recon);
+    border-left: 3px solid var(--recon-line);
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 16px 0;
+    font-size: 14.5px;
+    max-width: 68ch;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    margin: 16px 0 24px;
+    font-size: 14px;
+  }
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  th { color: var(--muted); font-weight: 600; font-size: 13px; }
+  code {
+    font-family: var(--mono);
+    background: #efece2;
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 0.9em;
+  }
+  pre {
+    background: var(--code-bg);
+    color: var(--code-ink);
+    padding: 16px 18px;
+    border-radius: 8px;
+    overflow-x: auto;
+    font-size: 13px;
+    line-height: 1.5;
+    margin: 12px 0 24px;
+  }
+  pre code { background: none; padding: 0; color: inherit; }
+  .diagram-card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 20px;
+    margin: 20px 0 32px;
+    overflow-x: auto;
+  }
+  .legend { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 14px; font-size: 12.5px; color: var(--muted); }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+  .toc { columns: 2; column-gap: 32px; font-size: 14px; margin: 24px 0 8px; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc li { margin-bottom: 6px; }
+  .adr-list { font-size: 14px; }
+  .adr-list li { margin-bottom: 6px; }
+  footer {
+    margin-top: 64px;
+    padding-top: 20px;
+    border-top: 1px solid var(--line);
+    font-size: 13px;
+    color: var(--muted);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="doc-header">
+    <div class="kicker">Documento de arquitetura — versão consolidada</div>
+    <h1>Registro de Operações Multi-Clearing</h1>
+    <p class="subtitle">Ingestão via Kafka, DynamoDB como base de dados única, processamento assíncrono via Streams, SNS e SQS, e exportação analítica via Glue/Athena.</p>
+  </header>
+
+  <nav>
+    <ul class="toc">
+      <li><a href="#visao-geral">1. Visão geral</a></li>
+      <li><a href="#fluxo">2. Fluxo de ponta a ponta</a></li>
+      <li><a href="#modelagem">3. Modelagem de dados</a></li>
+      <li><a href="#exemplos">4. Exemplos de dados</a></li>
+      <li><a href="#decisoes">5. Decisões-chave e por quê</a></li>
+      <li><a href="#pendencias">6. Pontos em aberto</a></li>
+      <li><a href="#adrs">7. ADRs relacionados</a></li>
+    </ul>
+  </nav>
+
+  <h2 id="visao-geral">1. Visão geral</h2>
+  <p>
+    O sistema recebe operações de produtos financeiros de duas origens — mensagens Kafka e, no futuro,
+    um arquivo disponibilizado via S3 — e é responsável por registrar cada operação em uma ou mais
+    <strong>clearings</strong> (B3, SELIC, CIP/Nuclea, com Laqus/CERC/TAG como extensões previstas do
+    mesmo padrão). O DynamoDB é a <strong>única base de dados</strong> do sistema: fonte da verdade do
+    ciclo de vida de cada operação, sem projeção paralela em banco relacional.
+  </p>
+  <p>
+    O envio às clearings é orientado a eventos: o DynamoDB Streams dispara o processamento assim que uma
+    operação é gravada, e a resposta da clearing chega de forma assíncrona via SNS, roteada por uma fila
+    SQS antes de atualizar o estado final. Uma exportação noturna via AWS Glue disponibiliza os dados no
+    data mesh da empresa, consultável via Athena, para relatórios e análises que o DynamoDB não atende
+    nativamente.
+  </p>
+
+  <h2 id="fluxo">2. Fluxo de ponta a ponta</h2>
+  <div class="diagram-card">
+    <svg viewBox="0 0 900 940" width="100%" role="img" aria-label="Diagrama de arquitetura do sistema de registro multi-clearing">
+      <defs>
+        <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M1 1 L9 5 L1 9 Z" fill="#5b5c58"/>
+        </marker>
+        <marker id="arrowDash" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M1 1 L9 5 L1 9 Z" fill="#9a988e"/>
+        </marker>
+      </defs>
+
+      <!-- main pipeline -->
+      <g font-family="inherit">
+        <!-- 1 Kafka -->
+        <rect x="60" y="20" width="220" height="58" rx="8" fill="#f1efe6" stroke="#b9b6a8"/>
+        <text x="170" y="42" text-anchor="middle" font-size="13.5" font-weight="600" fill="#1c1d1b">Kafka</text>
+        <text x="170" y="60" text-anchor="middle" font-size="11.5" fill="#5b5c58">Mensagem da operação</text>
+
+        <line x1="170" y1="78" x2="170" y2="112" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 2 Lambda A -->
+        <rect x="60" y="112" width="220" height="58" rx="8" fill="var(--lambda)" stroke="var(--lambda-line)"/>
+        <text x="170" y="134" text-anchor="middle" font-size="13.5" font-weight="600">Lambda: consumer Kafka</text>
+        <text x="170" y="152" text-anchor="middle" font-size="11.5" fill="#5b5c58">Valida e grava no DynamoDB</text>
+
+        <line x1="170" y1="170" x2="170" y2="204" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 3 DynamoDB -->
+        <rect x="60" y="204" width="220" height="58" rx="8" fill="var(--dynamo)" stroke="var(--dynamo-line)"/>
+        <text x="170" y="226" text-anchor="middle" font-size="13.5" font-weight="600">DynamoDB: outbox + tracking</text>
+        <text x="170" y="244" text-anchor="middle" font-size="11.5" fill="#5b5c58">Única fonte da verdade</text>
+
+        <line x1="170" y1="262" x2="170" y2="296" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 4 Streams -->
+        <rect x="60" y="296" width="220" height="58" rx="8" fill="var(--msg)" stroke="var(--msg-line)"/>
+        <text x="170" y="318" text-anchor="middle" font-size="13.5" font-weight="600">DynamoDB Streams</text>
+        <text x="170" y="336" text-anchor="middle" font-size="11.5" fill="#5b5c58">Dispara Lambda de envio</text>
+
+        <line x1="170" y1="354" x2="170" y2="388" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 5 Lambda B -->
+        <rect x="60" y="388" width="220" height="58" rx="8" fill="var(--lambda)" stroke="var(--lambda-line)"/>
+        <text x="170" y="410" text-anchor="middle" font-size="13.5" font-weight="600">Lambda: envia à clearing</text>
+        <text x="170" y="428" text-anchor="middle" font-size="11.5" fill="#5b5c58">Gateway multi-clearing</text>
+
+        <line x1="170" y1="446" x2="170" y2="480" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 6 Clearing -->
+        <rect x="60" y="480" width="220" height="58" rx="8" fill="#f1efe6" stroke="#b9b6a8"/>
+        <text x="170" y="502" text-anchor="middle" font-size="13.5" font-weight="600">B3 / SELIC / CIP</text>
+        <text x="170" y="520" text-anchor="middle" font-size="11.5" fill="#5b5c58">Processa, responde depois</text>
+
+        <line x1="170" y1="538" x2="170" y2="572" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 7 SNS -->
+        <rect x="60" y="572" width="220" height="58" rx="8" fill="var(--msg)" stroke="var(--msg-line)"/>
+        <text x="170" y="594" text-anchor="middle" font-size="13.5" font-weight="600">SNS: tópico de resposta</text>
+        <text x="170" y="612" text-anchor="middle" font-size="11.5" fill="#5b5c58">Notificação assíncrona</text>
+
+        <line x1="170" y1="630" x2="170" y2="664" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 8 SQS -->
+        <rect x="60" y="664" width="220" height="58" rx="8" fill="var(--msg)" stroke="var(--msg-line)"/>
+        <text x="170" y="686" text-anchor="middle" font-size="13.5" font-weight="600">SQS: fila intermediária</text>
+        <text x="170" y="704" text-anchor="middle" font-size="11.5" fill="#5b5c58">Buffer, retry e DLQ</text>
+
+        <line x1="170" y1="722" x2="170" y2="756" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+
+        <!-- 9 Lambda C -->
+        <rect x="60" y="756" width="220" height="58" rx="8" fill="var(--dynamo)" stroke="var(--dynamo-line)"/>
+        <text x="170" y="778" text-anchor="middle" font-size="13.5" font-weight="600">Lambda: atualiza DynamoDB</text>
+        <text x="170" y="796" text-anchor="middle" font-size="11.5" fill="#5b5c58">Correlaciona por IdExterno</text>
+
+        <!-- loop back -->
+        <path d="M280,785 L330,785 L330,233 L280,233" fill="none" stroke="#5b5c58" stroke-width="1.4" marker-end="url(#arrow)"/>
+        <text x="336" y="510" font-size="11" fill="#5b5c58" transform="rotate(90 336 510)" text-anchor="middle">grava novo evento e status</text>
+
+        <!-- side column: referencia + reconciliacao -->
+        <rect x="440" y="204" width="200" height="58" rx="8" fill="#f1efe6" stroke="#b9b6a8"/>
+        <text x="540" y="226" text-anchor="middle" font-size="13" font-weight="600">Tabela de referência</text>
+        <text x="540" y="244" text-anchor="middle" font-size="11" fill="#5b5c58">Clearings + StatusMapping</text>
+        <line x1="280" y1="417" x2="440" y2="417" stroke="#9a988e" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrowDash)"/>
+        <line x1="540" y1="262" x2="540" y2="300" stroke="#9a988e" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <line x1="440" y1="417" x2="540" y2="417" stroke="#9a988e" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <text x="460" y="405" font-size="10.5" fill="#9a988e">consulta ao enviar</text>
+
+        <rect x="440" y="388" width="200" height="58" rx="8" fill="var(--recon)" stroke="var(--recon-line)"/>
+        <text x="540" y="410" text-anchor="middle" font-size="13" font-weight="600">Job de reconciliação</text>
+        <text x="540" y="428" text-anchor="middle" font-size="11" fill="#5b5c58">Lê pendentes, consulta clearing</text>
+        <line x1="280" y1="325" x2="540" y2="325" stroke="#9a988e" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <line x1="540" y1="325" x2="540" y2="388" stroke="#9a988e" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#arrowDash)"/>
+        <text x="360" y="316" font-size="10.5" fill="#9a988e">lê itens pendentes</text>
+
+        <!-- reporting column -->
+        <rect x="680" y="204" width="180" height="58" rx="8" fill="#eef4fb" stroke="#7ea6cf"/>
+        <text x="770" y="226" text-anchor="middle" font-size="13" font-weight="600">Glue (job noturno)</text>
+        <text x="770" y="244" text-anchor="middle" font-size="11" fill="#5b5c58">Exporta por tipo de item</text>
+
+        <line x1="640" y1="233" x2="680" y2="233" stroke="#5b5c58" stroke-width="1.2" marker-end="url(#arrow)"/>
+
+        <line x1="770" y1="262" x2="770" y2="296" stroke="#5b5c58" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="680" y="296" width="180" height="58" rx="8" fill="#eef4fb" stroke="#7ea6cf"/>
+        <text x="770" y="318" text-anchor="middle" font-size="13" font-weight="600">S3 — data mesh</text>
+        <text x="770" y="336" text-anchor="middle" font-size="11" fill="#5b5c58">outbox / eventos / divergências</text>
+
+        <line x1="770" y1="354" x2="770" y2="388" stroke="#5b5c58" stroke-width="1.2" marker-end="url(#arrow)"/>
+        <rect x="680" y="388" width="180" height="58" rx="8" fill="#eef4fb" stroke="#7ea6cf"/>
+        <text x="770" y="410" text-anchor="middle" font-size="13" font-weight="600">Athena</text>
+        <text x="770" y="428" text-anchor="middle" font-size="11" fill="#5b5c58">Consulta analítica / BI</text>
+      </g>
+    </svg>
+    <div class="legend">
+      <span><span class="swatch" style="background:#f1efe6;border:1px solid #b9b6a8"></span>Entrada / externo</span>
+      <span><span class="swatch" style="background:var(--lambda);border:1px solid var(--lambda-line)"></span>Lambda</span>
+      <span><span class="swatch" style="background:var(--dynamo);border:1px solid var(--dynamo-line)"></span>DynamoDB</span>
+      <span><span class="swatch" style="background:var(--msg);border:1px solid var(--msg-line)"></span>Mensageria (Streams/SNS/SQS)</span>
+      <span><span class="swatch" style="background:var(--recon);border:1px solid var(--recon-line)"></span>Reconciliação</span>
+      <span><span class="swatch" style="background:#eef4fb;border:1px solid #7ea6cf"></span>Analítico (Glue/S3/Athena)</span>
+    </div>
+  </div>
+
+  <h3>Passo a passo</h3>
+  <table>
+    <tr><th>#</th><th>Etapa</th><th>Detalhe</th></tr>
+    <tr><td>1</td><td>Kafka → Lambda A</td><td>A Lambda valida o schema da mensagem por produto e gera o <code>IdExterno</code> — determinístico se a origem puder duplicar a entrega.</td></tr>
+    <tr><td>2</td><td>Lambda A → DynamoDB</td><td><code>PutItem</code> condicional (<code>attribute_not_exists</code>) garante idempotência na gravação do item <code>OUTBOX</code>.</td></tr>
+    <tr><td>3</td><td>DynamoDB Streams → Lambda B</td><td>Disparo quase imediato após a gravação. Lambda B consulta a tabela de referência para resolver o adapter/protocolo da clearing.</td></tr>
+    <tr><td>4</td><td>Lambda B → Clearing</td><td>Envio via o protocolo específico (FIX para B3, arquivo/mensageria para SELIC e CIP/Nuclea). Falha de rede não é tratada como sucesso nem rejeição — vai para retry via fila com atraso.</td></tr>
+    <tr><td>5</td><td>Clearing → SNS → SQS → Lambda C</td><td>Resposta assíncrona, correlacionada de volta pelo <code>IdExterno</code> ecoado pela clearing. SQS no meio garante buffer, retry e DLQ.</td></tr>
+    <tr><td>6</td><td>Lambda C → DynamoDB</td><td>Atualiza o item <code>OUTBOX</code> (status final) e grava um novo item <code>EVENT#...</code> no histórico — sempre os dois juntos.</td></tr>
+    <tr><td>7</td><td>Job de reconciliação</td><td>Roda periodicamente, lê itens pendentes há mais tempo que o esperado (via GSI) e consulta a clearing diretamente para fechar o estado.</td></tr>
+    <tr><td>8</td><td>Glue → S3 → Athena</td><td>Exportação noturna, separada por tipo de item (<code>outbox_snapshot</code>, <code>eventos_historico</code>, <code>divergencias</code>) para consulta analítica sem sobrecarregar a tabela operacional.</td></tr>
+  </table>
+
+  <h2 id="modelagem">3. Modelagem de dados</h2>
+  <p>O DynamoDB é a única base do sistema, organizada em duas tabelas físicas:</p>
+  <table>
+    <tr><th>Tabela</th><th>Contém</th><th>Características</th></tr>
+    <tr><td><code>OperacoesOutboxTracking</code></td><td>Itens <code>OUTBOX</code>, <code>EVENT#...</code> e <code>DIVERGENCIA#...</code>, todos com <code>PK = IdExterno</code></td><td>Alto volume, escrita constante, Streams habilitado</td></tr>
+    <tr><td><code>ReferenciaClearing</code></td><td>Metadados de clearing e mapeamento de status (<code>StatusMapping</code>)</td><td>Baixo volume, muda raramente, sem Streams</td></tr>
+  </table>
+
+  <h3>Padrões de acesso</h3>
+  <table>
+    <tr><th>Necessidade</th><th>Operação</th></tr>
+    <tr><td>Gravar operação nova (idempotente)</td><td><code>PutItem</code> em <code>SK="OUTBOX"</code> com <code>ConditionExpression: attribute_not_exists(PK)</code></td></tr>
+    <tr><td>Consultar status atual</td><td><code>GetItem(PK=IdExterno, SK="OUTBOX")</code></td></tr>
+    <tr><td>Consultar histórico completo</td><td><code>Query(PK=IdExterno, SK begins_with "EVENT#")</code></td></tr>
+    <tr><td>Encontrar pendentes para reconciliação</td><td>GSI esparsa: <code>PK=StatusEnvio</code>, <code>SK=ProximaTentativa</code> — só itens <code>OUTBOX</code> aparecem</td></tr>
+    <tr><td>Painel operacional por clearing</td><td>GSI: <code>PK=ClearingCodigo</code>, <code>SK=StatusEnvio</code></td></tr>
+    <tr><td>Traduzir status recebido da clearing</td><td><code>Query</code> em <code>ReferenciaClearing</code> por <code>PK="CLEARING#{codigo}"</code></td></tr>
+  </table>
+
+  <h2 id="exemplos">4. Exemplos de dados</h2>
+
+  <h3>Mensagem de entrada (Kafka)</h3>
+  <pre><code>{
+  "id": "ORD-2026-00812345",
+  "id-externo": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "clearing": "B3",
+  "produto": "debenture",
+  "atributos": {
+    "codigoAtivo": "DEBE11",
+    "quantidade": 1000,
+    "valorUnitario": 102.35,
+    "contraparteId": "CP-4471"
+  }
+}</code></pre>
+
+  <h3>Item <code>OUTBOX</code> (DynamoDB)</h3>
+  <pre><code>{
+  "PK": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "SK": "OUTBOX",
+  "IdOrigem": "ORD-2026-00812345",
+  "ClearingCodigo": "B3",
+  "Produto": "debenture",
+  "Atributos": {
+    "codigoAtivo": "DEBE11",
+    "quantidade": 1000,
+    "valorUnitario": 102.35,
+    "contraparteId": "CP-4471"
+  },
+  "StatusEnvio": "pendente",
+  "Tentativas": 0,
+  "DataCriacao": 1757430000,
+  "UltimaAtualizacao": 1757430000
+}</code></pre>
+
+  <h3>Item <code>EVENT#...</code> (histórico, append-only)</h3>
+  <pre><code>{
+  "PK": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "SK": "EVENT#2026-09-09T14:32:10#a1b2c3",
+  "StatusAnterior": "enviada",
+  "StatusNovo": "confirmada",
+  "Origem": "clearing-b3",
+  "Detalhe": "Código de resposta 01"
+}</code></pre>
+
+  <h3>Item de referência — <code>StatusMapping</code></h3>
+  <pre><code>{
+  "PK": "CLEARING#B3",
+  "SK": "STATUSMAP#04",
+  "StatusCanonico": "rejeitada",
+  "Descricao": "Rejeitada por regra de negócio"
+}</code></pre>
+
+  <h2 id="decisoes">5. Decisões-chave e por quê</h2>
+  <div class="note">
+    <strong>DynamoDB como única fonte da verdade.</strong> Elimina a necessidade de projeção assíncrona
+    entre dois bancos e a complexidade de resolver ordem de eventos entre sistemas distintos.
+  </div>
+  <div class="note">
+    <strong>Lambda em vez de ECS/KCL para consumir o Streams.</strong> Nessa escala (milhões de
+    operações/dia), o event source mapping nativo do Lambda entrega throughput suficiente sem gestão
+    manual de shard, sem dependência de JVM/MultiLangDaemon exigida por KCL em ECS.
+  </div>
+  <div class="note">
+    <strong>SNS → SQS → Lambda, não SNS → Lambda direto.</strong> A fila no meio garante buffer contra
+    picos, retry configurável e DLQ para respostas de clearing que falhem ao processar.
+  </div>
+  <div class="note">
+    <strong><code>IdExterno</code> como chave de correlação.</strong> Ecoado pela clearing na resposta,
+    é o único jeito da Lambda C saber qual item atualizar quando a notificação chega pelo SNS.
+  </div>
+  <div class="warn">
+    <strong>Timeout nunca é sucesso nem falha definitiva.</strong> Ausência de resposta dentro do prazo
+    esperado move a operação para um estado explícito de "desconhecido", resolvido pela reconciliação —
+    nunca inferido como confirmado ou rejeitado por omissão.
+  </div>
+  <div class="warn">
+    <strong>Exportação para o Glue separada por tipo de item.</strong> Um dump bruto da tabela
+    single-table mistura itens <code>OUTBOX</code>, <code>EVENT#</code> e <code>DIVERGENCIA#</code> sob
+    o mesmo schema aparente — a transformação do Glue precisa separar por prefixo de <code>SK</code>
+    antes de escrever no data mesh, senão o Athena fica com um schema impraticável.
+  </div>
+
+  <h2 id="pendencias">6. Pontos em aberto</h2>
+  <ul>
+    <li>Confirmar que todas as clearings (B3, SELIC, CIP/Nuclea) suportam ecoar de volta o <code>IdExterno</code> na resposta — sem isso a correlação via SNS não funciona.</li>
+    <li>Definir o schema de validação de <code>Atributos</code> por produto na Lambda A, antes da gravação no DynamoDB.</li>
+    <li>Confirmar uso do DynamoDB export-to-S3 nativo como origem do Glue, em vez de <code>Scan</code> direto na tabela, para não competir com a capacidade de leitura operacional.</li>
+    <li>Ingestão via arquivo S3 (segundo canal de entrada) ainda não detalhada neste documento — segue o mesmo padrão da Lambda A, com idempotência determinística por linha do arquivo.</li>
+  </ul>
+
+  <h2 id="adrs">7. ADRs relacionados</h2>
+  <ul class="adr-list">
+    <li><code>ADR-001-outbox-pattern.md</code> — superado (outbox baseado em SQL Server)</li>
+    <li><code>ADR-002-particionamento-eventos.md</code> — superado (tabela removida do SQL)</li>
+    <li><code>ADR-003-aws-secrets-manager.md</code> — em vigor</li>
+    <li><code>ADR-004</code> — a ser escrito: consolidação da arquitetura descrita neste documento (DynamoDB único, Lambda + Streams, SNS/SQS, Glue/Athena)</li>
+  </ul>
+
+  <footer>
+    Documento gerado a partir da discussão de arquitetura do projeto de Registro de Operações Multi-Clearing.
+    Mantenha este arquivo como referência viva — atualize junto com o ADR-004 conforme decisões novas forem tomadas.
+  </footer>
+
+</div>
+</body>
+</html>
